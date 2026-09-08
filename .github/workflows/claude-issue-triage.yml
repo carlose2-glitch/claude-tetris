@@ -66,8 +66,27 @@ jobs:
               - Si ninguna encaja, no asignes ninguna y dilo en el diagnostico.
 
             ## Paso 4 - Redactar el diagnostico
+            El comentario se publica en GitHub, asi que TODO su contenido debe estar
+            escrito en Markdown de GitHub (GFM) valido, para que se renderice bien:
+              - Encabezados con `##` / `###`, negrita con `**...**`, listas con `-`.
+              - Archivos, funciones, rutas y comandos siempre entre comillas
+                invertidas: `game.js`, `tryRotate()`, `game.js:120`, `gh issue view`.
+              - Todo fragmento de codigo va en un bloque vallado con triple comilla
+                invertida indicando el lenguaje (js, css, html, bash, diff). Nunca
+                pegues codigo sin vallar ni lo indentes a mano con 4 espacios.
+              - Enlaces con [texto](url). Referencias a issues o PRs con #numero.
+              - Usa listas de tareas `- [ ]` para los pasos accionables de la
+                propuesta de solucion, y tablas GFM si comparas alternativas.
+              - Separadores horizontales con `---` en su propia linea.
+              - Nada de HTML crudo salvo el marcador `<!-- claude-triage -->`.
+              - Deja SIEMPRE una linea en blanco antes y despues de cada encabezado,
+                lista, tabla o bloque de codigo: sin ella GitHub no los renderiza.
+              - Nada de indentacion sobrante al principio de las lineas: cualquier
+                linea que empiece con 4 espacios GitHub la pinta como codigo.
+
             Escribe el comentario en un fichero local (por ejemplo diagnostico.md) con
-            exactamente esta estructura:
+            exactamente esta estructura (los encabezados de seccion en negrita, cada
+            uno separado por una linea en blanco):
 
               <!-- claude-triage -->
               ## Diagnostico automatico
@@ -113,6 +132,9 @@ jobs:
                   gh issue comment ${{ github.event.issue.number }} --body-file diagnostico.md
 
             ## Restricciones
+            - Antes de publicar, relee diagnostico.md y comprueba que es Markdown de
+              GitHub valido: bloques de codigo cerrados, lineas en blanco alrededor de
+              encabezados y listas, y sin indentacion accidental.
             - No modifiques el codigo del proyecto ni el cuerpo del issue.
             - No abras pull requests ni hagas commits.
             - No cierres el issue.
