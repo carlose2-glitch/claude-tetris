@@ -28,6 +28,12 @@ const PIECES = [
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+const THEME_STORAGE_KEY = 'tetris-theme';
+const THEME_PALETTES = {
+  dark: { grid: '#22222e', highlight: 'rgba(255,255,255,0.12)', icon: '🌙' },
+  light: { grid: '#d8d8e4', highlight: 'rgba(0,0,0,0.12)', icon: '☀️' },
+};
+
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next-canvas');
@@ -39,8 +45,9 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const themeToggleBtn = document.getElementById('theme-toggle');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -163,13 +170,13 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
+  context.fillStyle = THEME_PALETTES[theme].highlight;
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
   context.globalAlpha = 1;
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = THEME_PALETTES[theme].grid;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -218,6 +225,16 @@ function drawNext() {
       drawBlock(nextCtx, offX + c, offY + r, shape[r][c], NB);
 }
 
+function applyTheme(newTheme) {
+  theme = newTheme;
+  document.body.classList.toggle('light-theme', theme === 'light');
+  themeToggleBtn.textContent = THEME_PALETTES[theme].icon;
+  themeToggleBtn.setAttribute('aria-pressed', String(theme === 'light'));
+  localStorage.setItem(THEME_STORAGE_KEY, theme);
+  if (current) draw();
+  if (next) drawNext();
+}
+
 function endGame() {
   gameOver = true;
   cancelAnimationFrame(animId);
@@ -257,6 +274,7 @@ function loop(ts) {
 }
 
 function init() {
+  applyTheme(localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark');
   board = createBoard();
   score = 0;
   lines = 0;
@@ -300,5 +318,6 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+themeToggleBtn.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
 
 init();
