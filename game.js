@@ -201,6 +201,9 @@ function draw() {
     for (let c = 0; c < COLS; c++)
       drawBlock(ctx, c, r, board[r][c], BLOCK);
 
+  // tras el game over la pieza no llegó a entrar: se pinta solo el tablero
+  if (gameOver) return;
+
   // ghost
   const gy = ghostY();
   for (let r = 0; r < current.shape.length; r++)
@@ -270,6 +273,10 @@ function loop(ts) {
     }
   }
   draw();
+  // lockPiece() puede haber terminado la partida: el cancelAnimationFrame() de
+  // endGame() apuntaba a este mismo frame, que ya había disparado, así que no
+  // sirvió de nada. Hay que salir sin encolar el siguiente.
+  if (gameOver) return;
   animId = requestAnimationFrame(loop);
 }
 
