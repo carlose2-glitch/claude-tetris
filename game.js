@@ -15,6 +15,7 @@ const COLORS = [
   '#ffb74d', // L - orange
   '#b0bec5', // N - tuerca (gris metálico)
   '#ff4081', // B - bomba (rosa intenso)
+  '#7c4dff', // R - rayo (violeta eléctrico)
 ];
 
 const PIECES = [
@@ -28,13 +29,19 @@ const PIECES = [
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
   [[8,8,8],[8,0,8],[8,8,8]],                  // N - tuerca (3x3 con hueco central)
   [[9]],                                       // B - bomba (1x1, explota al caer)
+  [[10]],                                      // R - rayo (1x1, arrasa fila o columna)
 ];
 
-// La bomba no entra en el sorteo aleatorio: aparece cada BOMB_EVERY piezas.
-const BOMB = PIECES.length - 1;
+// Las piezas especiales no entran en el sorteo aleatorio (que solo cubre 1..BOMB-1):
+// cada una aparece por contador, cada BOMB_EVERY / RAY_EVERY piezas.
+const BOMB = 9;
 const BOMB_EVERY = 12;
 const BOMB_RADIUS = 1; // radio 1 => área de 3 x 3
 const BOMB_SCORE = 10; // puntos por bloque destruido
+
+const RAY = 10;
+const RAY_EVERY = 15;
+const RAY_SCORE = 15; // puntos por bloque arrasado
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
@@ -57,7 +64,7 @@ const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme, piecesUntilBomb;
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme, piecesUntilBomb, piecesUntilRay;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -69,9 +76,17 @@ function makePiece(type) {
 }
 
 function randomPiece() {
-  if (--piecesUntilBomb <= 0) {
+  // Se descuentan siempre los dos contadores para que ninguna especial se
+  // salte su turno cuando ambas coinciden en la misma pieza.
+  piecesUntilBomb--;
+  piecesUntilRay--;
+  if (piecesUntilBomb <= 0) {
     piecesUntilBomb = BOMB_EVERY;
     return makePiece(BOMB);
+  }
+  if (piecesUntilRay <= 0) {
+    piecesUntilRay = RAY_EVERY;
+    return makePiece(RAY);
   }
   return makePiece(Math.floor(Math.random() * (BOMB - 1)) + 1);
 }
@@ -148,6 +163,28 @@ function collapseColumns() {
   }
 }
 
+// El rayo arrasa la fila o la columna donde cae. La elección es aleatoria: el
+// jugador no decide cuál de las dos toca.
+function strike(cx, cy) {
+  let destroyed = 0;
+  if (Math.random() < 0.5) {
+    // Fila entera: el rayo se para ENCIMA del montón, así que su propia fila
+    // está vacía; la que arrasa es la de justo debajo, la que ha golpeado (o la
+    // suya si ha caído hasta el suelo). Se elimina y todo lo de encima baja.
+    const row = Math.min(cy + 1, ROWS - 1);
+    destroyed = board[row].reduce((n, v) => n + (v ? 1 : 0), 0);
+    board.splice(row, 1);
+    board.unshift(new Array(COLS).fill(0));
+  } else {
+    // columna entera: se vacía de arriba abajo
+    for (let r = 0; r < ROWS; r++) {
+      if (board[r][cx]) { board[r][cx] = 0; destroyed++; }
+    }
+  }
+  score += destroyed * RAY_SCORE;
+  updateHUD();
+}
+
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
@@ -192,6 +229,7 @@ function softDrop() {
 
 function lockPiece() {
   if (current.type === BOMB) explode(current.x, current.y);
+  else if (current.type === RAY) strike(current.x, current.y);
   else merge();
   clearLines();
   spawn();
@@ -215,6 +253,7 @@ function updateHUD() {
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
   if (colorIndex === BOMB) { drawBomb(context, x, y, size, alpha); return; }
+  if (colorIndex === RAY) { drawRay(context, x, y, size, alpha); return; }
   const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
@@ -246,6 +285,31 @@ function drawBomb(context, x, y, size, alpha) {
   context.beginPath();
   context.moveTo(cx, cy - rad);
   context.quadraticCurveTo(cx + rad, cy - rad, cx + rad * 0.7, cy - rad - rad * 0.6);
+  context.stroke();
+  context.globalAlpha = 1;
+}
+
+// Polígono del rayo en coordenadas normalizadas (0..1) dentro de la celda.
+const RAY_PATH = [
+  [0.62, 0.04], [0.18, 0.56], [0.44, 0.56],
+  [0.34, 0.96], [0.82, 0.42], [0.54, 0.42],
+];
+
+function drawRay(context, x, y, size, alpha) {
+  context.globalAlpha = alpha ?? 1;
+  context.fillStyle = COLORS[RAY];
+  context.beginPath();
+  RAY_PATH.forEach(([px, py], i) => {
+    const cx = x * size + px * size;
+    const cy = y * size + py * size;
+    if (i === 0) context.moveTo(cx, cy);
+    else context.lineTo(cx, cy);
+  });
+  context.closePath();
+  context.fill();
+  // brillo
+  context.strokeStyle = THEME_PALETTES[theme].highlight;
+  context.lineWidth = 2;
   context.stroke();
   context.globalAlpha = 1;
 }
@@ -366,6 +430,7 @@ function init() {
   dropInterval = 1000;
   dropAccum = 0;
   piecesUntilBomb = BOMB_EVERY;
+  piecesUntilRay = RAY_EVERY;
   lastTime = performance.now();
   next = randomPiece();
   spawn();

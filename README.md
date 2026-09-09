@@ -37,6 +37,7 @@ Es una versión jugable del Tetris clásico con todas las mecánicas que esperar
 - Las **7 piezas estándar** (I, O, T, S, Z, J, L) con colores diferenciados.
 - Una **pieza extra de reto**: la **tuerca** (N), un bloque 3 × 3 con el centro hueco. Al apoyarse deja siempre un agujero interior que hay que rellenar por los lados.
 - Una **bomba** (B): cada 12 piezas aparece una pieza redonda de color rosa que no se fija al tablero. Al aterrizar **destruye un área de 3 × 3** a su alrededor, los bloques que quedan flotando caen y suma 10 puntos por bloque destruido.
+- Un **rayo** (R): cada 15 piezas aparece una pieza con forma de rayo, en violeta, que tampoco se fija al tablero. Al aterrizar **arrasa una fila o una columna entera**; **cuál de las dos es aleatorio**, el jugador no lo elige. En modo fila arrasa la fila que golpea (la de justo debajo, ya que la pieza se para encima del montón); en modo columna vacía su propia columna de arriba abajo. Suma 15 puntos por bloque arrasado.
 - **Rotación** con _wall kicks_ básicos (pequeños desplazamientos para que la pieza pueda rotar pegada a la pared).
 - **Soft drop** (bajada acelerada) y **hard drop** (caída instantánea).
 - **Pieza fantasma** (_ghost piece_): muestra dónde aterrizará la pieza actual.
@@ -116,6 +117,7 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Wall kicks** (`tryRotate`): si la rotación choca, intenta desplazar la pieza ±1 y ±2 columnas antes de descartar el giro.
 - **Game loop** (`loop`): basado en `requestAnimationFrame`, acumula el tiempo transcurrido y baja la pieza una fila cuando se supera `dropInterval`.
 - **Bomba** (`explode` / `collapseColumns`): la pieza `BOMB` no se fusiona con el tablero; al bloquearse vacía el área de 3 × 3 centrada en ella y después compacta cada columna hacia abajo, lo que puede encadenar líneas completas.
+- **Rayo** (`strike`): tampoco se fusiona con el tablero. Con `Math.random() < 0.5` decide si arrasa una fila o una columna. La fila es la que golpea (`cy + 1`, la de debajo de donde se para, o la suya si cae al suelo) y se elimina entera bajando todo lo de encima; la columna es la suya, que se vacía de arriba abajo.
 - **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
 - **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
@@ -180,6 +182,8 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `BOMB_EVERY`   | Cada cuántas piezas aparece la bomba     | `12`                  |
 | `BOMB_RADIUS`  | Radio de la explosión (1 = área 3 × 3)   | `1`                   |
 | `BOMB_SCORE`   | Puntos por bloque destruido con la bomba | `10`                  |
+| `RAY_EVERY`    | Cada cuántas piezas aparece el rayo      | `15`                  |
+| `RAY_SCORE`    | Puntos por bloque arrasado con el rayo   | `15`                  |
 | `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
 | `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
 
