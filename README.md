@@ -120,7 +120,8 @@ Contiene toda la lógica del juego. A grandes rasgos:
 - **Rayo** (`strike`): tampoco se fusiona con el tablero. Con `Math.random() < 0.5` decide si arrasa una fila o una columna. La fila es la que golpea (`cy + 1`, la de debajo de donde se para, o la suya si cae al suelo) y se elimina entera bajando todo lo de encima; la columna es la suya, que se vacía de arriba abajo.
 - **Limpieza de líneas** (`clearLines`): recorre el tablero de abajo hacia arriba; cada fila completa se elimina y se inserta una vacía en la cima.
 - **Puntuación**: usa la tabla clásica `[0, 100, 300, 500, 800]` multiplicada por el nivel actual; el hard drop suma 2 puntos por celda recorrida y el soft drop 1 punto por fila.
-- **Nivel y velocidad**: el nivel sube cada 10 líneas; la velocidad de caída se calcula como `max(100, 1000 − (level − 1) × 90)` milisegundos.
+- **Nivel**: sube cada 10 líneas y multiplica la puntuación de cada línea. Va por su cuenta: ya no interviene en la velocidad.
+- **Velocidad** (`dropIntervalFor`): la caída se acelera un **10 % de la velocidad inicial cada 20 líneas**, de forma acumulativa y lineal. Con `n = floor(lines / 20)` escalones, el intervalo entre bajadas es `max(100, round(1000 / (1 + 0,1 × n)))` milisegundos: 1000 ms de salida, 909 ms a las 20 líneas, 833 ms a las 40, 667 ms a las 100 y 500 ms a las 200.
 - **Ghost piece** (`ghostY`): proyecta la posición final de la pieza actual hacia abajo y la dibuja con `globalAlpha = 0.2`.
 
 ### Flujo del juego
@@ -185,7 +186,9 @@ Algunos parámetros fáciles de tunear en `game.js`:
 | `RAY_EVERY`    | Cada cuántas piezas aparece el rayo      | `15`                  |
 | `RAY_SCORE`    | Puntos por bloque arrasado con el rayo   | `15`                  |
 | `LINE_SCORES`  | Puntos por 1, 2, 3 o 4 líneas eliminadas | `[0,100,300,500,800]` |
-| `dropInterval` | Velocidad inicial de caída en ms         | `1000`                |
+| `INITIAL_DROP` | Velocidad inicial de caída en ms         | `1000`                |
+| `SPEEDUP_LINES`| Cada cuántas líneas se acelera la caída  | `20`                  |
+| `SPEEDUP_RATE` | Aceleración por escalón (% del inicial)  | `0.10`                |
 
 > Si cambias `COLS`, `ROWS` o `BLOCK`, recuerda ajustar también `width` y `height` del `<canvas id="board">` en `index.html` para que coincida (`COLS × BLOCK` × `ROWS × BLOCK`).
 

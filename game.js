@@ -45,6 +45,10 @@ const RAY_SCORE = 15; // puntos por bloque arrasado
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
+const INITIAL_DROP = 1000;  // ms entre bajada y bajada al empezar
+const SPEEDUP_LINES = 20;   // cada cuántas líneas se acelera la caída
+const SPEEDUP_RATE = 0.10;  // 10 % de la velocidad INICIAL por escalón
+
 const THEME_STORAGE_KEY = 'tetris-theme';
 const THEME_PALETTES = {
   dark: { grid: '#22222e', highlight: 'rgba(255,255,255,0.12)', icon: '🌙' },
@@ -199,9 +203,17 @@ function clearLines() {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
     level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    dropInterval = dropIntervalFor(lines);
     updateHUD();
   }
+}
+
+// La velocidad sube un SPEEDUP_RATE de la velocidad INICIAL por cada escalón de
+// SPEEDUP_LINES líneas (acumulación lineal, no compuesta); el intervalo entre
+// bajadas es su inverso. El nivel va por su cuenta y ya no toca la velocidad.
+function dropIntervalFor(clearedLines) {
+  const steps = Math.floor(clearedLines / SPEEDUP_LINES);
+  return Math.max(100, Math.round(INITIAL_DROP / (1 + SPEEDUP_RATE * steps)));
 }
 
 function ghostY() {
@@ -404,7 +416,11 @@ function loop(ts) {
   lastTime = ts;
   dropAccum += dt;
   if (dropAccum >= dropInterval) {
-    dropAccum = 0;
+    // Se descuenta el intervalo en vez de poner el acumulador a 0: así no se
+    // tira el sobrante del frame y el periodo real es exacto. Con dropAccum = 0
+    // el ritmo se redondeaba a frames enteros (16,7 ms a 60 fps) y una mejora
+    // pequeña, como el 1 % de 1000 ms, se perdía entera en el redondeo.
+    dropAccum -= dropInterval;
     if (!collide(current.shape, current.x, current.y + 1)) {
       current.y++;
     } else {
@@ -427,7 +443,7 @@ function init() {
   level = 1;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  dropInterval = dropIntervalFor(lines);
   dropAccum = 0;
   piecesUntilBomb = BOMB_EVERY;
   piecesUntilRay = RAY_EVERY;
