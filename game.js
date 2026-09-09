@@ -481,7 +481,19 @@ document.addEventListener('keydown', e => {
   updateHUD();
 });
 
-restartBtn.addEventListener('click', init);
-themeToggleBtn.addEventListener('click', () => applyTheme(theme === 'dark' ? 'light' : 'dark'));
+// Tras un clic con el ratón el botón se queda con el foco del DOM, y entonces el
+// navegador lo vuelve a activar al pulsar Espacio. Con la partida terminada o en
+// pausa el keydown sale antes del preventDefault() del hard drop, así que ese
+// Espacio acababa cambiando el tema. Se suelta el foco solo si el clic vino del
+// ratón (detail > 0); si vino del teclado se respeta, para no romper el tabulado.
+function blurAfterMouseClick(e) {
+  if (e.detail > 0) e.currentTarget.blur();
+}
+
+restartBtn.addEventListener('click', e => { blurAfterMouseClick(e); init(); });
+themeToggleBtn.addEventListener('click', e => {
+  blurAfterMouseClick(e);
+  applyTheme(theme === 'dark' ? 'light' : 'dark');
+});
 
 init();
