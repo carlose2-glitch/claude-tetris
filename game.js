@@ -13,6 +13,8 @@ const COLORS = [
   '#e57373', // Z - red
   '#64b5f6', // J - azul pálido
   '#ffb74d', // L - orange
+  '#b0bec5', // N - tuerca (gris metálico)
+  '#ff4081', // B - bomba (rosa intenso)
 ];
 
 const PIECES = [
@@ -24,7 +26,15 @@ const PIECES = [
   [[5,5,0],[0,5,5],[0,0,0]],                  // Z
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[8,8,8],[8,0,8],[8,8,8]],                  // N - tuerca (3x3 con hueco central)
+  [[9]],                                       // B - bomba (1x1, explota al caer)
 ];
+
+// La bomba no entra en el sorteo aleatorio: aparece cada BOMB_EVERY piezas.
+const BOMB = PIECES.length - 1;
+const BOMB_EVERY = 12;
+const BOMB_RADIUS = 1; // radio 1 => área de 3 x 3
+const BOMB_SCORE = 10; // puntos por bloque destruido
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
@@ -47,16 +57,23 @@ const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 const themeToggleBtn = document.getElementById('theme-toggle');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme;
+let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, theme, piecesUntilBomb;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 }
 
-function randomPiece() {
-  const type = Math.floor(Math.random() * 7) + 1;
+function makePiece(type) {
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
+}
+
+function randomPiece() {
+  if (--piecesUntilBomb <= 0) {
+    piecesUntilBomb = BOMB_EVERY;
+    return makePiece(BOMB);
+  }
+  return makePiece(Math.floor(Math.random() * (BOMB - 1)) + 1);
 }
 
 function collide(shape, ox, oy) {
@@ -98,6 +115,37 @@ function merge() {
     for (let c = 0; c < current.shape[r].length; c++)
       if (current.shape[r][c])
         board[current.y + r][current.x + c] = current.shape[r][c];
+}
+
+// Vacía el área alrededor de la bomba y deja caer lo que quede flotando.
+function explode(cx, cy) {
+  let destroyed = 0;
+  for (let r = cy - BOMB_RADIUS; r <= cy + BOMB_RADIUS; r++) {
+    if (r < 0 || r >= ROWS) continue;
+    for (let c = cx - BOMB_RADIUS; c <= cx + BOMB_RADIUS; c++) {
+      if (c < 0 || c >= COLS) continue;
+      if (board[r][c]) { board[r][c] = 0; destroyed++; }
+    }
+  }
+  collapseColumns();
+  score += destroyed * BOMB_SCORE;
+  updateHUD();
+}
+
+// Compacta cada columna hacia abajo para que el hueco de la explosión no deje
+// bloques flotando en el aire.
+function collapseColumns() {
+  for (let c = 0; c < COLS; c++) {
+    let write = ROWS - 1;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (!board[r][c]) continue;
+      if (write !== r) {
+        board[write][c] = board[r][c];
+        board[r][c] = 0;
+      }
+      write--;
+    }
+  }
 }
 
 function clearLines() {
@@ -143,7 +191,8 @@ function softDrop() {
 }
 
 function lockPiece() {
-  merge();
+  if (current.type === BOMB) explode(current.x, current.y);
+  else merge();
   clearLines();
   spawn();
 }
@@ -165,6 +214,7 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
+  if (colorIndex === BOMB) { drawBomb(context, x, y, size, alpha); return; }
   const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
   context.fillStyle = color;
@@ -172,6 +222,31 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   // highlight
   context.fillStyle = THEME_PALETTES[theme].highlight;
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  context.globalAlpha = 1;
+}
+
+function drawBomb(context, x, y, size, alpha) {
+  const cx = x * size + size / 2;
+  const cy = y * size + size / 2;
+  const rad = size / 2 - 3;
+  context.globalAlpha = alpha ?? 1;
+  // cuerpo
+  context.fillStyle = COLORS[BOMB];
+  context.beginPath();
+  context.arc(cx, cy, rad, 0, Math.PI * 2);
+  context.fill();
+  // brillo
+  context.fillStyle = THEME_PALETTES[theme].highlight;
+  context.beginPath();
+  context.arc(cx - rad / 3, cy - rad / 3, rad / 3.5, 0, Math.PI * 2);
+  context.fill();
+  // mecha
+  context.strokeStyle = COLORS[BOMB];
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(cx, cy - rad);
+  context.quadraticCurveTo(cx + rad, cy - rad, cx + rad * 0.7, cy - rad - rad * 0.6);
+  context.stroke();
   context.globalAlpha = 1;
 }
 
@@ -290,6 +365,7 @@ function init() {
   gameOver = false;
   dropInterval = 1000;
   dropAccum = 0;
+  piecesUntilBomb = BOMB_EVERY;
   lastTime = performance.now();
   next = randomPiece();
   spawn();
